@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<meta http-equiv="Cache-Control" content="no-store" />
+<head>
+<title>FM-Tableau Connector</title>
+<link rel="stylesheet" href="css/fm_connector.css">
+<script src="i18n/lang_en.js" type="text/javascript"></script>
+<script src="js/jquery-1.11.1.min.js" type="text/javascript"></script>
+<script src="js/tableauwdc-1.1.1.js" type="text/javascript"></script>
+<script src="js/fm_connector_util.js" type="text/javascript"></script>
+<script src="js/fm_connector.js" type="text/javascript"></script>
+<script type="text/javascript">
+  (function(){
+    var language = ((navigator.language) ? navigator.language : navigator.userLanguage).substr(0, 2).toLowerCase();
+    var node = document.createElement('script');
+    node.src="i18n/lang_"+language+".js";
+    node.id = "lang";
+    document.head.appendChild(node)
+  })();
+</script>
+</head>
+<body>
+  <div class="inputBox" id="loginForm">
+    <div class="inputBoxTitle" id="loginFormTitle"><h3> </h3></div>
+    <div class="fieldset">
+      <div class="left">
+        <label for="solutionName" class="required"> </label>
+        <input type="text" name="solution" id="solutionName" autofocus="">
+
+        <label for="layoutName" class="required"></label>
+        <input type="text" name="layout" id="layoutName">
+
+        <input type="checkbox" value="incremental" id="incremental">
+        <label class="checkbox-label" for="incremental"> </label>
+        <div class="tooltip">
+          <span class="tooltiptext" id="incrementalTP"></span>
+        </div>
+      </div>
+      <div class="right">
+        <label for="user"></label>
+        <input type="text" name="user" id="user">
+        <label for="password"></label>
+        <input type="password" name="layout" id="password">
+
+        <button type="button" class="submitButton" id="submitButton"></button>
+
+        <div id="oauth-container">
+          <div id="fm-native-login-dialog-separator">
+  					<div id="oauth-required-label" class="portrait"> </div>
+  					<div class="fm-native-login-dialog-separator-line"> </div>
+  				</div>
+          <label class="oauth-label" for="oauth_providers"></label>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="loader">
+  <div class="spinner">
+    <div class="spinner-container container1">
+      <div class="circle1"></div><div class="circle2"></div><div class="circle3"></div><div class="circle4"></div>
+    </div>
+    <div class="spinner-container container2">
+      <div class="circle1"></div><div class="circle2"></div><div class="circle3"></div><div class="circle4"></div>
+    </div>
+    <div class="spinner-container container3">
+      <div class="circle1"></div><div class="circle2"></div><div class="circle3"></div><div class="circle4"></div>
+    </div>
+    <p id="Connecting"></p>
+  </div>
+</div>
+</body>
+</html>
