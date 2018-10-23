@@ -5,9 +5,9 @@
 <link rel="stylesheet" href="css/fm_connector.css">
 <script src="i18n/lang_en.js" type="text/javascript"></script>
 <script src="js/jquery-1.11.1.min.js" type="text/javascript"></script>
-<script src="js/tableauwdc-1.1.1.js" type="text/javascript"></script>
+<script src="js/tableauwdc-2.3.latest.js" type="text/javascript"></script>
 <script src="js/fm_connector_util.js" type="text/javascript"></script>
-<script src="js/fm_connector.js" type="text/javascript"></script>
+<script src="js/fm_connector_v2.js" type="text/javascript"></script>
 <script type="text/javascript">
   (function(){
     var language = ((navigator.language) ? navigator.language : navigator.userLanguage).substr(0, 2).toLowerCase();
@@ -40,6 +40,9 @@
         <input type="text" name="user" id="user">
         <label for="password"></label>
         <input type="password" name="layout" id="password">
+
+        <label for="pageSize" class="required"></label>
+        <input type="text" name="pageSize" id="pageSize">
 
         <button type="button" class="submitButton" id="submitButton"></button>
 
