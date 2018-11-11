@@ -103,17 +103,19 @@ var util = {
     var new_record = [];
     for (var j=0; j < keys.length; j++) {
       var key = keys[j].replace(/::/, "__");
-      new_record[key] = record[keys[j]];
+      record[key] = record[keys[j]];
+      delete record[keys[j]];
     }
+
     columns.forEach(function(column) {
       try{
         if ( column.dataType == 'date') {
             var d = record[column.id].split('/'); //["03", "15", "2017"]
-          new_record[column.id] = d[2]+'-'+d[0]+'-'+d[1]; // Returns yyyy-MM-dd'
+          record[column.id] = d[2]+'-'+d[0]+'-'+d[1]; // Returns yyyy-MM-dd'
         } else if ( column.dataType == 'datetime') {
-          var t = new_record[column.id].substr(10); // t = ' HH:mm:ss'
-          var d = new_record[column.id].substr(0,10).split('/'); //["03", "15", "2017"]
-          new_record[column.id] = d[2]+'-'+d[0]+'-'+d[1] + t; // Returns yyyy-MM-dd HH:mm:ss'
+          var t = record[column.id].substr(10); // t = ' HH:mm:ss'
+          var d = record[column.id].substr(0,10).split('/'); //["03", "15", "2017"]
+          record[column.id] = d[2]+'-'+d[0]+'-'+d[1] + t; // Returns yyyy-MM-dd HH:mm:ss'
         }
       }catch(e){
         console.log("failed to convert date/datetime", e)
@@ -149,8 +151,6 @@ var util = {
       }
     })*/
 
-    return new_record;
+    return record;
   }
-
-
 }
