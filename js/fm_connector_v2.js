@@ -48,7 +48,7 @@
         id: layout,
         alias: layout,
         columns: columns,
-        incrementColumnId: "_recordid"
+        incrementColumnId: "_recordId"
       })
     });
 
