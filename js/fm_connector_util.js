@@ -104,9 +104,9 @@ var util = {
             var d = record[column.id].split('/'); //["03", "15", "2017"]
             record[column.id] = d[2]+'-'+d[0]+'-'+d[1]; // Returns yyyy-MM-dd'
         } else if ( column.dataType == 'datetime') {
-
-          var d = record[column.id].split('/'); //["03", "15", "2017"]
-          record[column.id] = d[2] + '-' + d[0] + '-' + d[1]; // Returns yyyy-MM-dd'
+          var t = record[fieldNames[i]].substr(10); // t = ' HH:mm:ss'
+          var d = record[fieldNames[i]].substr(0,10).split('/'); //["03", "15", "2017"]
+          record[fieldNames[i]] = d[2]+'-'+d[0]+'-'+d[1] + t; // Returns yyyy-MM-dd HH:mm:ss'
         }
       }catch(e){
         console.log("failed to convert date/datetime", e)
