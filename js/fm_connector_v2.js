@@ -60,15 +60,14 @@
   // The user input for the max iterations determines the number of rows to add.
   fmConnector.getData = function(table, doneCallback) {
     var conf  = JSON.parse(tableau.connectionData);
-    var passwordObj = fmConnector.getPasswordObj();
+    //var passwordObj = fmConnector.getPasswordObj();
     var lastRecordId = table.incrementValue
     var layout = table.tableInfo.id
 
-    if (passwordObj.token[layout] === undefined) {
+    if (conf.passwordObj.token[layout] === undefined) {
       return tableau.abortWithError(lang.Error_Missing_Session_Token);
     }
 
-    var lastRecordToken = passwordObj.cursors[layout] || ''
     //lastRecordToken is a string, either empty string or recordToken, so it need to converted to number to match recordId data type.
     if (lastRecordToken.length === 0){
       lastRecordId = '';
@@ -86,6 +85,9 @@
       lastRecordId = parseInt(table.incrementValue);
     }
 
+    conf  = JSON.parse(tableau.connectionData);
+    var lastRecordToken = conf.passwordObj.cursors[layout] || ''
+
     // to call fetch data api
     var pageSize = parseInt(conf.pageSize || 1000); //500 5000
     var connectionUrl = conf.apiPath + "databases/"+encodeURIComponent(conf.solution) + "/layouts/" + encodeURIComponent(layout) + "/cursor?_limit="+pageSize;
@@ -94,7 +96,7 @@
       url: connectionUrl,
       dataType: 'json',
       contentType: "application/json",
-      headers: {"Authorization": "Bearer " + passwordObj.token[layout], "X-FM-Data-Cursor-Token":lastRecordToken },
+      headers: {"Authorization": "Bearer " + conf.passwordObj.token[layout], "X-FM-Data-Cursor-Token":lastRecordToken },
       success: function (res, textStatus, xhr)  {
         if (res.messages && res.messages[0].code === '0') {
           if(res.response.data.length>0){
@@ -158,13 +160,13 @@
   fmConnector.getMetaData = function(layout){
     var connectionConf  = JSON.parse(tableau.connectionData);
     var connectionUrl = connectionConf.apiPath + "databases/"+encodeURIComponent(connectionConf.solution) +"/layouts/"+encodeURIComponent(layout)+"/metadata";
-    var passwordObj = fmConnector.getPasswordObj();
+    //var passwordObj = fmConnector.getPasswordObj();
 
     var result = null
     var xhr = $.ajax({
       url: connectionUrl,
       type:"GET",
-      headers: {"Authorization": "Bearer " + passwordObj.token[layout]},
+      headers: {"Authorization": "Bearer " + connectionConf.passwordObj.tokens[layout]},
       success: function (res, textStatus, xhr) {
         if (res.messages && res.messages[0].code === '0') {
           if(res.response.metaData.length==0){
@@ -187,20 +189,21 @@
   fmConnector.createDataCursor = function(layout) {
     ///lastRecordToken is a string so it need to converted to number to match recordId data type.
     var conf  = JSON.parse(tableau.connectionData);
-    var passwordObj = fmConnector.getPasswordObj();
+    //var passwordObj = fmConnector.getPasswordObj();
+
     // calling createCursor api
     var connectionUrl = conf.apiPath +"databases/" + encodeURIComponent(conf.solution) +"/layouts/" + encodeURIComponent(layout) + "/cursor";
-    console.log("CREATE CUSRSOR TOKEN FOR ", layout);
+    console.log("CREATE CURSOR TOKEN FOR ", layout);
     var xhr = $.ajax({
       url: connectionUrl,
       dataType: 'json',
       contentType: "application/json",
-      headers: {"Authorization": "Bearer " + passwordObj.token[layout]},
+      headers: {"Authorization": "Bearer " + conf.passwordObj.tokens[layout]},
       type:"POST",
       success: function (res, textStatus, xhr) {
         if (res.messages && res.messages[0].code === '0') {
-          passwordObj.cursors[layout] = res.response.cursorToken;
-          tableau.password = JSON.stringify(passwordObj);
+          conf.passwordObj.cursors[layout] = res.response.cursorToken;
+          tableau.connectionData = JSON.stringify(conf);
         } else {
           throw new Error(lang.Error_Create_Cursor_Failed+": " + xhr.responseText);
         }
@@ -215,7 +218,8 @@
   // Reset Cursor for incremantal extraction
   fmConnector.resetDataCursor = function(layout, lastRecordId) {
     var conf  = JSON.parse(tableau.connectionData);
-    var passwordObj = fmConnector.getPasswordObj();
+    //var passwordObj = fmConnector.getPasswordObj();
+
     // calling createCursor api
     var connectionUrl = conf.apiPath +"databases/" + encodeURIComponent(conf.solution) +"/layouts/" + encodeURIComponent(layout) + "/cursor/reset";
     //console.log("RESET CUSRSOR ");
@@ -224,7 +228,7 @@
       url: connectionUrl,
       dataType: 'json',
       contentType: "application/json",
-      headers: {"Authorization": "Bearer " + passwordObj.token[layout], "X-FM-Data-Cursor-Token":passwordObj.cursors[layout] },
+      headers: {"Authorization": "Bearer " + conf.passwordObj.tokens[layout], "X-FM-Data-Cursor-Token": conf.passwordObj.cursors[layout] },
       type:"POST",
       data: lastRecordId===0 ? "" : JSON.stringify({recordId:lastRecordId.toString()}),
       success: function (res, textStatus, xhr) {
@@ -249,7 +253,7 @@
     //new token can't be updated into tableau.password and won't be reusable when this connector was reloaded.
     //We have to enforce logout for each shutdown after re-login to avoid creating idel FM session.
     if(tableau.phase === tableau.phaseEnum.gatherDataPhase && fmConnector.reLogin) {
-      var passwordObj = fmConnector.getPasswordObj();
+      //var passwordObj = fmConnector.getPasswordObj();
       var connectionConf = JSON.parse(tableau.connectionData);
       var connectionUrl = connectionConf.apiPath + "databases/" + encodeURIComponent(connectionConf.solution) + "/sessions";
       var layouts = connectionConf.layout.split(',')
@@ -258,7 +262,7 @@
         var xhr = $.ajax({
           url: connectionUrl,
           type: "DELETE",
-          headers: {"Authorization": "Bearer " + passwordObj.token[layout]},
+          headers: {"Authorization": "Bearer " + connectionConf.passwordObj.tokens[layout]},
           async: false,
           success: function (res, textStatus, xhr) {
             tableau.shutdownCallback();
@@ -273,7 +277,7 @@
   }
 
   /* helper functions */
-  fmConnector.getPasswordObj = function(){
+  /* fmConnector.getPasswordObj = function(){
     if(!tableau.password){
       return tableau.abortWithError(lang.Error_Missing_Password_Object );
     }
@@ -287,17 +291,23 @@
       }
     }
     return passwordObj;
-  }
+  } */
 
   fmConnector.FMLogin = function() {
     var connectionConf  = JSON.parse(tableau.connectionData);
     var layouts = connectionConf.layout.split(',')
-    var passwordObj = fmConnector.getPasswordObj();
+
+    /*var
+    passwordObj = fmConnector.getPasswordObj();
 
     //Reset token/cursors
     passwordObj.cursors = {}
     passwordObj.token = {}
     tableau.password = JSON.stringify(passwordObj);
+    */
+    connectionConf.passwordObj = { tokens: {}, cursors: {} }
+    tableau.connectionData = JSON.stringify(connectionConf);
+
 
     layouts.forEach(function (layout) {
         fmConnector.FMConnectLayout(layout)
@@ -305,21 +315,22 @@
     $('#loader').hide();
     tableau.submit();
   }
+
   //The optional string parameter lastRecordToken indicates that the wip session expired during Tableau extracting data.
   fmConnector.FMConnectLayout = function(layout, table, doneCallback) {
-    var passwordObj = fmConnector.getPasswordObj();
     var connectionConf  = JSON.parse(tableau.connectionData);
     var connectionUrl = connectionConf.apiPath + "databases/"+encodeURIComponent(connectionConf.solution)+"/sessions";
+
     var layout = layout || table.tableInfo.id
     if(connectionConf.loginType === "oauth"){
       var headers = {
-        "X-FM-Data-OAuth-Request-Id":passwordObj.oAuthRequestId,
-        "X-FM-Data-OAuth-Identifier":passwordObj.oAuthIdentifier
+        "X-FM-Data-OAuth-Request-Id":connectionConf.passwordObj.oAuthRequestId,
+        "X-FM-Data-OAuth-Identifier":connectionConf.passwordObj.oAuthIdentifier
       };
 
     }else{//Regular login with FM account
       var headers = {
-        "Authorization": "Basic " + window.btoa(tableau.username+':'+passwordObj.password) // will window.btoa actually work??
+        "Authorization": "Basic " + window.btoa(tableau.username + ':' + tableau.username) // will window.btoa actually work??
       };
     }
     var xhr = $.ajax({
@@ -333,8 +344,8 @@
       success: function (res, textStatus, xhr) {
         if (res.messages && res.messages[0].code === '0') {
           try {
-            passwordObj.token[layout] = xhr.getResponseHeader('x-fm-data-access-token');
-            tableau.password = JSON.stringify(passwordObj);
+            connectionConf.passwordObj.tokens[layout] = xhr.getResponseHeader('x-fm-data-access-token');
+            tableau.connectionData = JSON.stringify(connectionConf);
             if (tableau.phase === tableau.phaseEnum.gatherDataPhase) {
               //Re-login during a Tableau session, skip setup metadata and getTableData directly
               fmConnector.reLogin = true;
@@ -405,6 +416,7 @@
       connectionConf.solution = $('#solutionName').val().trim();
       connectionConf.layout = $('#layoutName').val().trim();
       connectionConf.incremental = $('#incremental').is(':checked');
+      connectionConf.passwordObj = { tokens: {}, cursors: {} }
       tableau.connectionData = JSON.stringify(connectionConf);
       tableau.username = "";
 
@@ -504,9 +516,12 @@
       connectionConf.layout = $('#layoutName').val().trim();
       connectionConf.pageSize = $('#pageSize').val().trim();
       connectionConf.incremental = $('#incremental').is(':checked');
+      connectionConf.passwordObj = { tokens: {}, cursors: {} }
+
       tableau.connectionData = JSON.stringify(connectionConf);
       tableau.username = $('#user').val().trim();
-      tableau.password = JSON.stringify({password: $('#password').val().trim(), token:''});
+      tableau.password = $('#password').val().trim()
+      //tableau.password = JSON.stringify({password: $('#password').val().trim(), token:''});
 
       if(tableau.phase === tableau.phaseEnum.interactivePhase || tableau.phase === tableau.phaseEnum.authPhase ){
         if(util.validateInput()){
