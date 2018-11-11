@@ -64,7 +64,7 @@
     var lastRecordId = table.incrementValue
     var layout = table.tableInfo.id
 
-    if (conf.passwordObj.token[layout] === undefined) {
+    if (conf.passwordObj.tokens[layout] === undefined) {
       return tableau.abortWithError(lang.Error_Missing_Session_Token);
     }
 
@@ -96,7 +96,7 @@
       url: connectionUrl,
       dataType: 'json',
       contentType: "application/json",
-      headers: {"Authorization": "Bearer " + conf.passwordObj.token[layout], "X-FM-Data-Cursor-Token":lastRecordToken },
+      headers: {"Authorization": "Bearer " + conf.passwordObj.tokens[layout], "X-FM-Data-Cursor-Token":lastRecordToken },
       success: function (res, textStatus, xhr)  {
         if (res.messages && res.messages[0].code === '0') {
           if(res.response.data.length>0){
