@@ -331,7 +331,7 @@
 
     }else{//Regular login with FM account
       var headers = {
-        "Authorization": "Basic " + window.btoa(tableau.username + ':' + tableau.username) // will window.btoa actually work??
+        "Authorization": "Basic " + window.btoa(tableau.username + ':' + tableau.password) // will window.btoa actually work??
       };
     }
     var xhr = $.ajax({
