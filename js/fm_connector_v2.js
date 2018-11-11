@@ -116,11 +116,12 @@
                 lastRecordId = record.recordId;
 
               })
-              hasMoreRecords = toRet.length < tableau.pageSize ? false : true;
+              hasMoreRecords = toRet.length < pageSize ? false : true;
               table.appendRows(toRet)
               //We intentionally pass an object contains lastRecordId via tableau.dataCallback to make it look different at the first loop.
               //tableau.dataCallback(toRet, JSON.stringify({lastRecordId:lastRecordId}), hasMoreRecords);
             } else {
+              hasMoreRecords = false;
               if(lastRecordId == 0){
                 return tableau.abortWithError(lang.Error_No_Results_Found);
               }
@@ -128,6 +129,7 @@
             }
 
           } else {
+            hasMoreRecords = false;
             tableau.abortWithError(lang.Error_Failed_To_Fetch_Data + " : " + xhr.responseText);
           }
         },
@@ -137,6 +139,7 @@
             fmConnector.FMConnectLayout(table.tableInfo.id, table, doneCallback);
           }
           else{
+            hasMoreRecords = false;
             tableau.abortWithError(lang.Error_Failed_To_Fetch_Data + " : " +util.makeErrorMessage(xhr, textStatus, thrownError));
           }
         }
