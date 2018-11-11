@@ -1,18 +1,16 @@
 (function() {
   var fmConnector = tableau.makeConnector();
 
-  fmConnector.init = function() {
+  fmConnector.init = function(callback) {
     // If there is connectionData present in the interactive phase or Authentication phase, repopulate the input text box.
     // This is hit when re-login or editing a connection in Tableau.
     if (tableau.phase === tableau.phaseEnum.interactivePhase || tableau.phase === tableau.phaseEnum.authPhase ) {
       if(tableau.connectionData){
-        //default value
-        $('#pageSize').val(1000);
 
         var conf  = JSON.parse(tableau.connectionData);
         $('#solutionName').val(conf.solution);
         $('#layoutName').val(conf.layout);
-        $('#pageSize').val(conf.pageSize);
+        $('#pageSize').val(conf.pageSize || 1000); //default value : 1000 records
         $('#user').val(tableau.username);
         $('#incremental').attr('checked', conf.incremental);
         $("#submitButton").prop('disabled', false);
@@ -26,6 +24,7 @@
       $(".inputBoxTitle h3").text(lang.Title_Login_Again)
       $('#solutionName').prop('disabled', true);
       $('#layoutName').prop('disabled', true);
+      $('#pageSize').prop('disabled', true);
       $('#incremental').prop('disabled', true);
       $('#user').focus();
     }
@@ -33,20 +32,23 @@
     // set tableau.alwaysShowAuthUI to true. This will make Tableau to display custom re-login UI when is re-open.
     tableau.alwaysShowAuthUI = true;
 
-    tableau.initCallback();
+    //tableau.initCallback();
+    callback()
   };
 
   fmConnector.getSchema = function(schemaCallback) {
+    var conf  = JSON.parse(tableau.connectionData);
 
-    var layouts = fmConnector.connectionData.layout.split(',');
+    var layouts =  conf.layout.split(',');
     // Schema for magnitude and place data
     var schemas = []
     layouts.forEach(function(layout){
-      result.push({
+      var columns = fmConnector.getMetaData(layout)
+      schemas.push({
         id: layout,
         alias: layout,
-        columns: fmConnector.getMetaData(layout),
-        incrementColumnId: "-recordid"
+        columns: columns,
+        incrementColumnId: "_recordid"
       })
     });
 
@@ -59,24 +61,29 @@
   fmConnector.getData = function(table, doneCallback) {
     var conf  = JSON.parse(tableau.connectionData);
     var passwordObj = fmConnector.getPasswordObj();
-    var lastRecordToken = passwordObj.cursors['layout']
-    var lastRecordId = 0
+    var lastRecordId = table.incrementValue
     var layout = table.tableInfo.id
+
+    if (passwordObj.token[layout] === undefined) {
+      return tableau.abortWithError(lang.Error_Missing_Session_Token);
+    }
+
+    var lastRecordToken = passwordObj.cursors[layout] || ''
     //lastRecordToken is a string, either empty string or recordToken, so it need to converted to number to match recordId data type.
     if (lastRecordToken.length === 0){
-      lastRecordId = 0;
-      fmConnector.resetDataCursor(lastRecordId);
+      lastRecordId = '';
+      fmConnector.resetDataCursor(layout, lastRecordId);
     } else if (!isNaN(lastRecordToken)){
       //Get here from the first loop of this function,
       //The lastRecordToken is pass in form Tableau _startRequestTableData which use _lastRefreshColVal for lastRecordToken
-      lastRecordId = parseInt(lastRecordToken);
+      lastRecordId = parseInt(table.incrementValue);
       //reset cursor at the first loop for incremental refresh.
-      fmConnector.resetDataCursor(lastRecordId);
+      fmConnector.resetDataCursor(layout, lastRecordId);
     } else {
       //Get here from the tableau.dataCallback loop
       //We intentionally pass an object contains lastRecordId via tableau.dataCallback to make it look different at the first loop.
-      var lastRecordTokenObj = JSON.parse(lastRecordToken);
-      lastRecordId = parseInt(lastRecordTokenObj.lastRecordId);
+      //var lastRecordTokenObj = JSON.parse(lastRecordToken);
+      lastRecordId = parseInt(table.incrementValue);
     }
 
     // to call fetch data api
@@ -87,17 +94,17 @@
       url: connectionUrl,
       dataType: 'json',
       contentType: "application/json",
-      headers: {"Authorization": "Bearer " + passwordObj.token, "X-FM-Data-Cursor-Token":passwordObj.cursorToken },
+      headers: {"Authorization": "Bearer " + passwordObj.token[layout], "X-FM-Data-Cursor-Token":lastRecordToken },
       success: function (res, textStatus, xhr)  {
         if (res.messages && res.messages[0].code === '0') {
           if(res.response.data.length>0){
             var toRet = [];
             res.response.data.forEach(function(record){
-              if(tableau.incrementalExtractColumn){
+              if(table.tableInfo.incrementColumnId){
                 //recordId must be in filedData for incremental extraction
-                record.fieldData['-recordId'] = record.recordId;
+                record.fieldData[table.tableInfo.incrementColumnId] = parseInt(record.recordId);
               }
-              toRet.push(util.dataToLocal(record.fieldData, conf.fieldTypes, conf.fieldNames));
+              toRet.push(util.dataToLocal(record.fieldData, table.tableInfo.columns));
               lastRecordId = record.recordId;
             })
             //hasMoreRecords = toRet.length < pageSize ? false : true;
@@ -109,7 +116,7 @@
             if(lastRecordId == 0){
               return tableau.abortWithError(lang.Error_No_Results_Found);
             }
-            tableau.dataCallback([], lastRecordToken, false);
+            doneCallback()
           }
 
         } else {
@@ -119,7 +126,7 @@
       error: function (xhr, textStatus, thrownError) {
         if(xhr.readyState===4 && xhr.responseText.indexOf("952")>-1){//handle Invalid token
           //If FM session expired during Tableau extracting data, we can relogin FM and pickup from lastRecordId.
-          fmConnector.FMLogin(lastRecordId.toString());
+          fmConnector.FMConnectLayout(table.tableInfo.id, table, doneCallback);
         }
         else{
           tableau.abortWithError(lang.Error_Failed_To_Fetch_Data + " : " +util.makeErrorMessage(xhr, textStatus, thrownError));
@@ -141,7 +148,7 @@
     })
 
     if(connectionConf.incremental){
-      fields.push({id:'-recordId', dataType:'int'})
+      fields.push({id:'_recordId', dataType:'int'})
       //-recordId must be included for incremental extraction.
     }
 
@@ -152,16 +159,18 @@
     var connectionConf  = JSON.parse(tableau.connectionData);
     var connectionUrl = connectionConf.apiPath + "databases/"+encodeURIComponent(connectionConf.solution) +"/layouts/"+encodeURIComponent(layout)+"/metadata";
     var passwordObj = fmConnector.getPasswordObj();
+
+    var result = null
     var xhr = $.ajax({
       url: connectionUrl,
       type:"GET",
-      headers: {"Authorization": "Bearer " + passwordObj.token},
+      headers: {"Authorization": "Bearer " + passwordObj.token[layout]},
       success: function (res, textStatus, xhr) {
         if (res.messages && res.messages[0].code === '0') {
           if(res.response.metaData.length==0){
             throw new Error(lang.Error_Get_Meta_Data_Failed +": "+ xhr.responseText);
           }else{
-            return fmConnector.parseMetaData(res.response.metaData);
+            result = fmConnector.parseMetaData(res.response.metaData);
           }
         } else {
           throw new Error(lang.Error_Get_Meta_Data_Failed +": "+ xhr.responseText);
@@ -172,6 +181,7 @@
       },
       async: false
     });
+    return result
   }
 
   fmConnector.createDataCursor = function(layout) {
@@ -180,12 +190,12 @@
     var passwordObj = fmConnector.getPasswordObj();
     // calling createCursor api
     var connectionUrl = conf.apiPath +"databases/" + encodeURIComponent(conf.solution) +"/layouts/" + encodeURIComponent(layout) + "/cursor";
-    //console.log("CREATE CUSRSOR TOKEN ");
+    console.log("CREATE CUSRSOR TOKEN FOR ", layout);
     var xhr = $.ajax({
       url: connectionUrl,
       dataType: 'json',
       contentType: "application/json",
-      headers: {"Authorization": "Bearer " + passwordObj.token},
+      headers: {"Authorization": "Bearer " + passwordObj.token[layout]},
       type:"POST",
       success: function (res, textStatus, xhr) {
         if (res.messages && res.messages[0].code === '0') {
@@ -214,7 +224,7 @@
       url: connectionUrl,
       dataType: 'json',
       contentType: "application/json",
-      headers: {"Authorization": "Bearer " + passwordObj.token, "X-FM-Data-Cursor-Token":passwordObj.cursorToken },
+      headers: {"Authorization": "Bearer " + passwordObj.token[layout], "X-FM-Data-Cursor-Token":passwordObj.cursors[layout] },
       type:"POST",
       data: lastRecordId===0 ? "" : JSON.stringify({recordId:lastRecordId.toString()}),
       success: function (res, textStatus, xhr) {
@@ -234,30 +244,32 @@
     });
   };
 
-  fmConnector.shutdown = function() {
+  fmConnector.shutdown = function(shutdownCallback) {
     //In case of re-login cuased by expried token durign gatehrData phase,
     //new token can't be updated into tableau.password and won't be reusable when this connector was reloaded.
     //We have to enforce logout for each shutdown after re-login to avoid creating idel FM session.
-    if(tableau.phase === tableau.phaseEnum.gatherDataPhase && fmConnector.reLogin){
+    if(tableau.phase === tableau.phaseEnum.gatherDataPhase && fmConnector.reLogin) {
       var passwordObj = fmConnector.getPasswordObj();
-      var connectionConf  = JSON.parse(tableau.connectionData);
-      var connectionUrl = connectionConf.apiPath + "databases/"+encodeURIComponent(connectionConf.solution)+"/sessions";
-      var xhr = $.ajax({
-        url: connectionUrl,
-        type:"DELETE",
-        headers: {"Authorization": "Bearer " + passwordObj.token},
-        success: function (res, textStatus, xhr) {
-          tableau.shutdownCallback();
-        },
-        error: function (xhr, textStatus, thrownError) {
-          tableau.abortWithError(lang.Error_Logout_Failed + " : " +util.makeErrorMessage(xhr, textStatus, thrownError));
-          tableau.shutdownCallback();
-        }
-      })
-    }else{
-      tableau.shutdownCallback();
-    }
+      var connectionConf = JSON.parse(tableau.connectionData);
+      var connectionUrl = connectionConf.apiPath + "databases/" + encodeURIComponent(connectionConf.solution) + "/sessions";
+      var layouts = connectionConf.layout.split(',')
 
+      layouts.forEach(function (layout) {
+        var xhr = $.ajax({
+          url: connectionUrl,
+          type: "DELETE",
+          headers: {"Authorization": "Bearer " + passwordObj.token[layout]},
+          async: false,
+          success: function (res, textStatus, xhr) {
+            tableau.shutdownCallback();
+          },
+          error: function (xhr, textStatus, thrownError) {
+            tableau.abortWithError(lang.Error_Logout_Failed + " : " + util.makeErrorMessage(xhr, textStatus, thrownError));
+          }
+        })
+      })
+    }
+    shutdownCallback();
   }
 
   /* helper functions */
@@ -270,18 +282,35 @@
       if(!passwordObj.token){
         return tableau.abortWithError(lang.Error_Missing_Session_Token  );
       }
-      if(!passwordObj.cursorToken){
+      if(!passwordObj.cursors){
         return tableau.abortWithError(lang.Error_Missing_Cursor_Token );
       }
     }
     return passwordObj;
   }
 
+  fmConnector.FMLogin = function() {
+    var connectionConf  = JSON.parse(tableau.connectionData);
+    var layouts = connectionConf.layout.split(',')
+    var passwordObj = fmConnector.getPasswordObj();
+
+    //Reset token/cursors
+    passwordObj.cursors = {}
+    passwordObj.token = {}
+    tableau.password = JSON.stringify(passwordObj);
+
+    layouts.forEach(function (layout) {
+        fmConnector.FMConnectLayout(layout)
+    })
+    $('#loader').hide();
+    tableau.submit();
+  }
   //The optional string parameter lastRecordToken indicates that the wip session expired during Tableau extracting data.
-  fmConnector.FMLogin = function(lastRecordToken) {
+  fmConnector.FMConnectLayout = function(layout, table, doneCallback) {
     var passwordObj = fmConnector.getPasswordObj();
     var connectionConf  = JSON.parse(tableau.connectionData);
     var connectionUrl = connectionConf.apiPath + "databases/"+encodeURIComponent(connectionConf.solution)+"/sessions";
+    var layout = layout || table.tableInfo.id
     if(connectionConf.loginType === "oauth"){
       var headers = {
         "X-FM-Data-OAuth-Request-Id":passwordObj.oAuthRequestId,
@@ -300,23 +329,22 @@
       headers: headers,
       type:"POST",
       data: {},
+      async: false,
       success: function (res, textStatus, xhr) {
         if (res.messages && res.messages[0].code === '0') {
-          try{
-            passwordObj.token = xhr.getResponseHeader('x-fm-data-access-token');
+          try {
+            passwordObj.token[layout] = xhr.getResponseHeader('x-fm-data-access-token');
             tableau.password = JSON.stringify(passwordObj);
-            fmConnector.createDataCursor();
-            if(tableau.phase === tableau.phaseEnum.gatherDataPhase){
-              fmConnector.reLogin = true;
+            if (tableau.phase === tableau.phaseEnum.gatherDataPhase) {
               //Re-login during a Tableau session, skip setup metadata and getTableData directly
-              fmConnector.getTableData(lastRecordToken);
-            }else{
-              fmConnector.getMetaData();
-              $('#loader').hide();
-              tableau.submit();
+              fmConnector.reLogin = true;
+              fmConnector.getData(table, doneCallback);
+            } else {
+              //console.log('create cursors')
+                fmConnector.createDataCursor(layout);
+                fmConnector.getMetaData(layout);
             }
           }catch(err){
-            $('#loader').hide();
             return tableau.abortWithError(err.message);
           }
         } else {
@@ -324,7 +352,6 @@
         }
       },
       error: function (xhr, textStatus, thrownError) {
-        $('#loader').hide();
         return  tableau.abortWithError(lang.Error_Login_Failed + " : " +util.makeErrorMessage(xhr, textStatus, thrownError));
       }
     });

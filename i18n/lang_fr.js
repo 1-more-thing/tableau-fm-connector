@@ -5,6 +5,7 @@ var lang = {
   Label_Source_Layout_Name : "Nom du modèle source :",
   Label_Account : "Nom de compte :",
   Label_Passwor : "Mot de passe :",
+  Label_PageSize : "Pagination :",
   Label_Or : "OU",
   Label_Incremental_Import : "Activer l'actualisation incrémentielle",
   Tooltip_Enable_Incremental_Refresh : "Activer l'option d'actualisation incrémentielle pour cette source de données.",

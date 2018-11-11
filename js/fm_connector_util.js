@@ -48,6 +48,7 @@ var util = {
     $("label[for=layoutName]").text(lang.Label_Source_Layout_Name);
     $("label[for=user]").text(lang.Label_Account);
     $("label[for=password]").text(lang.Label_Passwor);
+    $("label[for=pageSize]").text(lang.Label_PageSize);
     $("label[for=incremental]").text(lang.Label_Incremental_Import);
     $("label[for=oauth_providers]").text(lang.Label_Login_With);
     $("#incrementalTP").text(lang.Tooltip_Enable_Incremental_Refresh);
@@ -96,11 +97,23 @@ var util = {
     }
   },
 
-  dataToLocal : function(record, fieldTypes, fieldNames ){
-    //find data and datatime and convert into format following http://tableau.github.io/webdataconnector/docs/wdc_ref_date_formats
-    var dateIndices = [], datetimeIndices = [];
+  dataToLocal : function(record, columns){
+    columns.forEach(function(column) {
+      try{
+        if ( column.dataType == 'date') {
+            var d = record[column.id].split('/'); //["03", "15", "2017"]
+            record[column.id] = d[2]+'-'+d[0]+'-'+d[1]; // Returns yyyy-MM-dd'
+        } else if ( column.dataType == 'datetime') {
 
-    var idx = fieldTypes.indexOf('date');
+          var d = record[column.id].split('/'); //["03", "15", "2017"]
+          record[column.id] = d[2] + '-' + d[0] + '-' + d[1]; // Returns yyyy-MM-dd'
+        }
+      }catch(e){
+        console.log("failed to convert date/datetime", e)
+      }
+    })
+
+    /*var idx = fieldTypes.indexOf('date');
     while (idx != -1) {
       dateIndices.push(idx);
       idx = fieldTypes.indexOf('date', idx + 1);
@@ -127,7 +140,8 @@ var util = {
         record[fieldNames[i]] = d[2]+'-'+d[0]+'-'+d[1] + t; // Returns yyyy-MM-dd HH:mm:ss'
       }catch(e){
       }
-    })
+    })*/
+
     return record;
   }
 
