@@ -46,8 +46,8 @@ var util = {
     $("#submitButton").text(lang.Btn_Import_Data);
     $("label[for=solutionName]").text(lang.Label_Source_Solution_Name);
     $("label[for=layoutName]").text(lang.Label_Source_Layout_Name);
-    $("label[for=user]").text(lang.Label_Account);
-    $("label[for=password]").text(lang.Label_Passwor);
+    $("label[for=fm-user]").text(lang.Label_Account);
+    $("label[for=-fmpassword]").text(lang.Label_Passwor);
     $("label[for=pageSize]").text(lang.Label_PageSize);
     $("label[for=incremental]").text(lang.Label_Incremental_Import);
     $("label[for=oauth_providers]").text(lang.Label_Login_With);

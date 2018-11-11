@@ -305,6 +305,7 @@
     passwordObj.token = {}
     tableau.password = JSON.stringify(passwordObj);
     */
+    //Reset cursors & tokens
     connectionConf.passwordObj = { tokens: {}, cursors: {} }
     tableau.connectionData = JSON.stringify(connectionConf);
 
@@ -519,8 +520,8 @@
       connectionConf.passwordObj = { tokens: {}, cursors: {} }
 
       tableau.connectionData = JSON.stringify(connectionConf);
-      tableau.username = $('#user').val().trim();
-      tableau.password = $('#password').val().trim()
+      tableau.username = $('#fm-user').val().trim();
+      tableau.password = $('#fm-password').val().trim()
       //tableau.password = JSON.stringify({password: $('#password').val().trim(), token:''});
 
       if(tableau.phase === tableau.phaseEnum.interactivePhase || tableau.phase === tableau.phaseEnum.authPhase ){
