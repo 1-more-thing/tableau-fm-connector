@@ -100,7 +100,7 @@ var util = {
   dataToLocal : function(record, columns){
     var keys = Object.keys(record);
 
-    var new_record = []:
+    var new_record = [];
     for (var j=0; j < keys.length; j++) {
       var key = keys[j].replace(/::/, "__");
       new_record[key] = record[keys[j]];
