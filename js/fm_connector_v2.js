@@ -61,17 +61,21 @@
   fmConnector.getData = function(table, doneCallback) {
     var conf  = JSON.parse(tableau.connectionData);
     //var passwordObj = fmConnector.getPasswordObj();
-    var lastRecordId = table.incrementValue
+    var lastRecordId = parseInt(table.incrementValue || -1);
     var layout = table.tableInfo.id
 
     if (conf.passwordObj.tokens[layout] === undefined) {
       return tableau.abortWithError(lang.Error_Missing_Session_Token);
     }
 
-    //lastRecordToken is a string, either empty string or recordToken, so it need to converted to number to match recordId data type.
-    if (lastRecordToken.length === 0){
+
+    var lastRecordToken = conf.passwordObj.cursors[layout] || ''
+
+    //Full update request
+    if (lastRecordId === -1){
       lastRecordId = '';
       fmConnector.resetDataCursor(layout, lastRecordId);
+
     } else if (!isNaN(lastRecordToken)){
       //Get here from the first loop of this function,
       //The lastRecordToken is pass in form Tableau _startRequestTableData which use _lastRefreshColVal for lastRecordToken
