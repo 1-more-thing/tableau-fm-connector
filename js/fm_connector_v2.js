@@ -148,8 +148,8 @@
 
     var fields = []
     metaData.forEach(function(meta){
-      if(fields.indexOf(meta.name.replace('/::/g', '__')) == -1){ //skip duplicated field if it is already included
-        fields.push({id:meta.name.replace('/::/g', '__'), dataType:dataTypesMap[meta.result]})
+      if(fields.indexOf(meta.name.replace('/::/', '__')) == -1){ //skip duplicated field if it is already included
+        fields.push({id:meta.name.replace('/::/', '__'), dataType:dataTypesMap[meta.result]})
       }
     })
 
