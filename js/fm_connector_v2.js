@@ -10,7 +10,7 @@
         var conf  = JSON.parse(tableau.connectionData);
         $('#solutionName').val(conf.solution);
         $('#layoutName').val(conf.layout);
-        $('#pageSize').val(conf.pageSize || 1000); //default value : 1000 records
+        $('#pageSize').val(parseInt(conf.pageSize) || 1000); //default value : 1000 records
         $('#user').val(tableau.username);
         $('#incremental').attr('checked', conf.incremental);
         $("#submitButton").prop('disabled', false);
@@ -95,50 +95,54 @@
     // to call fetch data api
     var pageSize = parseInt(conf.pageSize || 1000); //500 5000
     var connectionUrl = conf.apiPath + "databases/"+encodeURIComponent(conf.solution) + "/layouts/" + encodeURIComponent(layout) + "/cursor?_limit="+pageSize;
-    var hasMoreRecords = false;
-    var xhr = $.ajax({
-      url: connectionUrl,
-      dataType: 'json',
-      contentType: "application/json",
-      headers: {"Authorization": "Bearer " + conf.passwordObj.tokens[layout], "X-FM-Data-Cursor-Token":lastRecordToken },
-      success: function (res, textStatus, xhr)  {
-        if (res.messages && res.messages[0].code === '0') {
-          if(res.response.data.length>0){
-            var toRet = [];
-            res.response.data.forEach(function(record){
-              if(table.tableInfo.incrementColumnId){
-                //recordId must be in filedData for incremental extraction
-                record.fieldData[table.tableInfo.incrementColumnId] = parseInt(record.recordId);
-              }
-              toRet.push(util.dataToLocal(record.fieldData, table.tableInfo.columns));
-              lastRecordId = record.recordId;
-            })
-            //hasMoreRecords = toRet.length < pageSize ? false : true;
-            table.appendRows(toRet)
-            doneCallback()
-            //We intentionally pass an object contains lastRecordId via tableau.dataCallback to make it look different at the first loop.
-            //tableau.dataCallback(toRet, JSON.stringify({lastRecordId:lastRecordId}), hasMoreRecords);
-          } else {
-            if(lastRecordId == 0){
-              return tableau.abortWithError(lang.Error_No_Results_Found);
-            }
-            doneCallback()
-          }
+    var hasMoreRecords = true;
+    while (hasMoreRecords)  {
+      var xhr = $.ajax({
+        url: connectionUrl,
+        dataType: 'json',
+        async:false,
+        contentType: "application/json",
+        headers: {"Authorization": "Bearer " + conf.passwordObj.tokens[layout], "X-FM-Data-Cursor-Token":lastRecordToken },
+        success: function (res, textStatus, xhr)  {
+          if (res.messages && res.messages[0].code === '0') {
+            if(res.response.data.length>0){
+              var toRet = [];
+              res.response.data.forEach(function(record){
+                if(table.tableInfo.incrementColumnId){
+                  //recordId must be in filedData for incremental extraction
+                  record.fieldData[table.tableInfo.incrementColumnId] = parseInt(record.recordId);
+                }
+                toRet.push(util.dataToLocal(record.fieldData, table.tableInfo.columns));
+                lastRecordId = record.recordId;
 
-        } else {
-          tableau.abortWithError(lang.Error_Failed_To_Fetch_Data + " : " + xhr.responseText);
+              })
+              hasMoreRecords = toRet.length < tableau.pageSize ? false : true;
+              table.appendRows(toRet)
+              //We intentionally pass an object contains lastRecordId via tableau.dataCallback to make it look different at the first loop.
+              //tableau.dataCallback(toRet, JSON.stringify({lastRecordId:lastRecordId}), hasMoreRecords);
+            } else {
+              if(lastRecordId == 0){
+                return tableau.abortWithError(lang.Error_No_Results_Found);
+              }
+              doneCallback()
+            }
+
+          } else {
+            tableau.abortWithError(lang.Error_Failed_To_Fetch_Data + " : " + xhr.responseText);
+          }
+        },
+        error: function (xhr, textStatus, thrownError) {
+          if(xhr.readyState===4 && xhr.responseText.indexOf("952")>-1){//handle Invalid token
+            //If FM session expired during Tableau extracting data, we can relogin FM and pickup from lastRecordId.
+            fmConnector.FMConnectLayout(table.tableInfo.id, table, doneCallback);
+          }
+          else{
+            tableau.abortWithError(lang.Error_Failed_To_Fetch_Data + " : " +util.makeErrorMessage(xhr, textStatus, thrownError));
+          }
         }
-      },
-      error: function (xhr, textStatus, thrownError) {
-        if(xhr.readyState===4 && xhr.responseText.indexOf("952")>-1){//handle Invalid token
-          //If FM session expired during Tableau extracting data, we can relogin FM and pickup from lastRecordId.
-          fmConnector.FMConnectLayout(table.tableInfo.id, table, doneCallback);
-        }
-        else{
-          tableau.abortWithError(lang.Error_Failed_To_Fetch_Data + " : " +util.makeErrorMessage(xhr, textStatus, thrownError));
-        }
+      });
       }
-    });
+    doneCallback()
   };
 
   //store field names, types and other resource metaData into tableau.connectionData
