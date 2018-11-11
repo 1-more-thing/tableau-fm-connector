@@ -100,11 +100,12 @@ var util = {
   dataToLocal : function(record, columns){
     var keys = Object.keys(record);
 
-    var new_record = [];
     for (var j=0; j < keys.length; j++) {
       var key = keys[j].replace(/::/, "__");
       record[key] = record[keys[j]];
-      delete record[keys[j]];
+      if (key !==keys[j] ) {
+        delete record[keys[j]];
+      }
     }
 
     columns.forEach(function(column) {
