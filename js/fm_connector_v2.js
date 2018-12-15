@@ -125,7 +125,6 @@
               if(lastRecordId == 0){
                 return tableau.abortWithError(lang.Error_No_Results_Found);
               }
-              doneCallback()
             }
 
           } else {
